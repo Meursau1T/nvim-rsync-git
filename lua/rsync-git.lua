@@ -1,3 +1,5 @@
+local M = {}
+
 -- 检查文件是否存在
 local function fileExists(filePath)
     local file = io.open(filePath, "r")
@@ -126,8 +128,7 @@ local function callRsync(path, args)
     local localPath = args.localPath
     local remotePath = args.remotePath
     local userIp = args.userIp
-    local rsyncParam = args.rsyncParam
-    local showLog = args.showLog
+    local rsyncParam = M.args.config.rsyncParam
 
     local origPath = string.format("%s/%s", localPath, path)
     local tgtPath = string.format("%s:%s/%s", userIp, remotePath, string.gsub(path, "%[", "\\["):gsub("%]", "\\]"))
@@ -135,38 +136,56 @@ local function callRsync(path, args)
     local cmd = string.format("-av%s", rsyncParam)
     local rsyncCommand = string.format("rsync %s %s %s", cmd, origPath, tgtPath)
 
-    print(rsyncCommand)
+    if M.args.config.showLog then
+      print(rsyncCommand)
+    end
     -- 执行 rsync 命令
     local result = runCommand(rsyncCommand)
 
     return result
 end
 
-local function main(args)
-    print("HELLO")
-    return 0
-    local disableGit = args.disableGit 
-    local currEditFiles = asyncByLog(getGitEdit())
-    local currEditDirs = table.unique(currEditFiles)
-    for _, item in ipairs(currEditDirs) do
-      callRsync(item, args)
-    end
-    if not disableGit then
-      callRsync(".git", args)
-    end
+
+M.args = {
+  rules = {},
+  config = {
+    rsyncParam = "",
+    disableGit = true,
+    showLog = false,
+  }
+}
+
+function M.setup(cfg)
+  M.args.config = {
+    rsyncParam = cfg.config.rsyncParam or M.args.config.rsyncParam,
+    disableGit = cfg.config.disableGit or M.args.config.disableGit,
+    showLog = cfg.config.showLog or M.args.config.showLog,
+  }
+  M.args.rules = cfg.rules;
 end
 
-local args = {
-    localPath = "/home/meursault/workspace/douyin_web",
-    remotePath = "/cloudide/workspace/douyin_web",
-    userIp = "cloudide-ws1f2f9f5f9c5d8672",
-    rsyncParam = "",
-    showLog = false,
-    disableGit = true
-}
+function M.rsync(rule)
+  local disableGit = M.args.config.disableGit 
+  local currEditFiles = asyncByLog(getGitEdit())
+  local currEditDirs = table.unique(currEditFiles)
+  for _, item in ipairs(currEditDirs) do
+    callRsync(item, rule)
+  end
+  if not disableGit then
+    callRsync(".git", rule)
+  end
+end
 
 vim.api.nvim_create_autocmd({"BufWritePost"}, {
   callback = function()
-    main(args)
+    local curr = vim.api.nvim_buf_get_name(0)
+    for _, rule in ipairs(M.args.rules) do
+      if string.match(curr, rule.cond) then
+        M.rsync(rule)
+        break
+      end
+    end
   end
-}
+})
+
+return M
