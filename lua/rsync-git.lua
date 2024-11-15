@@ -99,7 +99,10 @@ local function getGitEdit()
         lines[i] = line:gsub("^%s*%w%s*", "")  -- 删除开头的空格和一个字母
     end
 
-    removeItemsWithKeyword(lines, "aweme_idl")
+    local ignoreKeyword = M.args.config.ignoreKeyword
+    if ignoreKeyword then
+      removeItemsWithKeyword(lines, ignoreKeyword)
+    end
     
     return lines
 end
@@ -152,6 +155,7 @@ M.args = {
     rsyncParam = "",
     disableGit = true,
     showLog = false,
+    ignoreKeyword = nil,
   }
 }
 
@@ -160,6 +164,7 @@ function M.setup(cfg)
     rsyncParam = cfg.config.rsyncParam or M.args.config.rsyncParam,
     disableGit = cfg.config.disableGit or M.args.config.disableGit,
     showLog = cfg.config.showLog or M.args.config.showLog,
+    ignoreKeyword = cfg.config.ignoreKeyword or M.args.config.ignoreKeyword,
   }
   M.args.rules = cfg.rules;
 end
